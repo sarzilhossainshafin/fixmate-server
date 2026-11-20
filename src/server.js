@@ -9,6 +9,8 @@ import { createAuth } from "./config/auth.js";
 
 import { verifyToken } from "./middlewares/verifyToken.js";
 import { verifyAdmin } from "./middlewares/verifyRole.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import serviceRoutes from "./routes/serviceRoutes.js";
 
 dotenv.config();
 
@@ -27,10 +29,10 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
-    // Initialize BetterAuth
+    // Initialize Better Auth
     const auth = createAuth();
 
-    // BetterAuth routes
+    // Better Auth routes
     app.all("/api/auth/*splat", toNodeHandler(auth));
 
     app.use(express.json());
@@ -74,6 +76,11 @@ const startServer = async () => {
       }
     );
 
+    // Service API routes
+    app.use("/api/services", serviceRoutes);
+
+    // Admin API routes
+app.use("/api/admin", adminRoutes);
     app.listen(PORT, () => {
       console.log(`FixMate API server is running on port ${PORT}`);
     });
