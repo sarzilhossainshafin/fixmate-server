@@ -1,17 +1,17 @@
 
-const dns = require("dns");
+import dns from "node:dns";
+import { MongoClient } from "mongodb";
 
-// Use public DNS resolvers for MongoDB SRV lookup
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
-const { MongoClient } = require("mongodb");
-
+let client;
 let db;
 
 const connectDB = async () => {
   try {
-    const client = new MongoClient(process.env.MONGODB_URI);
+    if (db) return db;
 
+    client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
 
     db = client.db(process.env.DB_NAME);
@@ -33,4 +33,4 @@ const getDB = () => {
   return db;
 };
 
-module.exports = { connectDB, getDB };
+export { connectDB, getDB };

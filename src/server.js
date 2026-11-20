@@ -1,15 +1,20 @@
 
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { toNodeHandler } from "better-auth/node";
 
-const { connectDB } = require("./config/db");
+import { connectDB } from "./config/db.js";
+import { createAuth } from "./config/auth.js";
+
+import { verifyToken } from "./middlewares/verifyToken.js";
+import { verifyAdmin } from "./middlewares/verifyRole.js";
+
+dotenv.config();
 
 const app = express();
-
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
@@ -17,30 +22,60 @@ app.use(
   })
 );
 
-app.use(express.json());
-
-// Health check
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "FixMate API server is running!",
-  });
-});
-
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "FixMate server is healthy.",
-  });
-});
-
-// Connect database and start server
 const startServer = async () => {
   try {
+    // Connect to MongoDB
     await connectDB();
 
+    // Initialize BetterAuth
+    const auth = createAuth();
+
+    // BetterAuth routes
+    app.all("/api/auth/*splat", toNodeHandler(auth));
+
+    app.use(express.json());
+
+    // Home route
+    app.get("/", (req, res) => {
+      res.status(200).json({
+        success: true,
+        message: "FixMate API server is running!",
+      });
+    });
+
+    // Health check
+    app.get("/api/health", (req, res) => {
+      res.status(200).json({
+        success: true,
+        message: "FixMate server is healthy.",
+      });
+    });
+
+    // Protected JWT test route
+    app.get("/api/test/protected", verifyToken, (req, res) => {
+      res.status(200).json({
+        success: true,
+        message: "JWT verification successful!",
+        user: req.user,
+      });
+    });
+
+    // Admin-only test route
+    app.get(
+      "/api/test/admin",
+      verifyToken,
+      verifyAdmin,
+      (req, res) => {
+        res.status(200).json({
+          success: true,
+          message: "Admin access granted!",
+          user: req.user,
+        });
+      }
+    );
+
     app.listen(PORT, () => {
-      console.log(`FixMate server is running on port ${PORT}`);
+      console.log(`FixMate API server is running on port ${PORT}`);
     });
   } catch (error) {
     console.error("Server startup failed:", error.message);
