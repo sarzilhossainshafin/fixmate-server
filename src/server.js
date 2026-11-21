@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { toNodeHandler } from "better-auth/node";
-
+import userRoutes from "./routes/userRoutes.js";
 import { connectDB } from "./config/db.js";
 import { createAuth } from "./config/auth.js";
 
@@ -90,6 +90,9 @@ const startServer = async () => {
 
     // Admin API routes
     app.use("/api/admin", adminRoutes);
+
+    // User profile API routes
+app.use("/api/users", userRoutes);
 
     app.listen(PORT, () => {
       console.log(`FixMate API server is running on port ${PORT}`);

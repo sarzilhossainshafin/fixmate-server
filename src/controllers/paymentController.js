@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/db.js";
 
+// Initialize Stripe only when needed
 const getStripe = () => {
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error("Stripe secret key is not configured.");
@@ -60,6 +61,10 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
+    // BDT uses two decimal places.
+    // Example: 2000 BDT = 200000 paisa.
+    const amountInPaisa = Math.round(amount * 100);
+
     const frontendUrl =
       process.env.CLIENT_URL || "http://localhost:3000";
 
@@ -67,17 +72,16 @@ const createCheckoutSession = async (req, res) => {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["card"],
 
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: "bdt",
             product_data: {
               name: booking.serviceTitle,
               description: `FixMate repair booking ${booking._id}`,
             },
-            unit_amount: Math.round(amount * 100),
+            unit_amount: amountInPaisa,
           },
           quantity: 1,
         },
@@ -94,7 +98,7 @@ const createCheckoutSession = async (req, res) => {
       cancel_url: `${frontendUrl}/payment/cancel`,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Stripe Checkout Session created successfully.",
       checkoutUrl: session.url,
@@ -103,14 +107,14 @@ const createCheckoutSession = async (req, res) => {
   } catch (error) {
     console.error("Create checkout session error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to create checkout session.",
     });
   }
 };
 
-// Customer: Verify Stripe payment after successful checkout
+// Customer: Verify Stripe payment
 const verifyCheckoutSession = async (req, res) => {
   try {
     const { session_id: sessionId } = req.query;
@@ -125,6 +129,7 @@ const verifyCheckoutSession = async (req, res) => {
     const stripe = getStripe();
     const db = getDB();
 
+    // Retrieve Checkout Session from Stripe
     const session =
       await stripe.checkout.sessions.retrieve(sessionId);
 
@@ -162,12 +167,35 @@ const verifyCheckoutSession = async (req, res) => {
       });
     }
 
+    const expectedAmount = Math.round(
+      Number(booking.finalAmount) * 100
+    );
+
+    // Confirm the actual amount and currency with Stripe
+    if (
+      session.currency !== "bdt" ||
+      session.amount_total !== expectedAmount
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount or currency does not match the booking.",
+      });
+    }
+
     const payments = db.collection("payments");
 
     // Prevent duplicate payment records
-    await payments.createIndex({ bookingId: 1 }, { unique: true });
-    await payments.createIndex({ stripeSessionId: 1 }, { unique: true });
+    await payments.createIndex(
+      { bookingId: 1 },
+      { unique: true }
+    );
 
+    await payments.createIndex(
+      { stripeSessionId: 1 },
+      { unique: true }
+    );
+
+    // Check whether payment was already recorded
     let payment = await payments.findOne({
       bookingId: booking._id.toString(),
     });
@@ -176,7 +204,7 @@ const verifyCheckoutSession = async (req, res) => {
       const transactionId =
         typeof session.payment_intent === "string"
           ? session.payment_intent
-          : session.payment_intent?.id;
+          : session.payment_intent?.id || "";
 
       const paymentRecord = {
         bookingId: booking._id.toString(),
@@ -184,8 +212,8 @@ const verifyCheckoutSession = async (req, res) => {
         technicianName: booking.technicianName || "",
         technicianEmail: booking.technicianEmail,
         amount: Number(booking.finalAmount),
-        currency: "usd",
-        transactionId: transactionId || "",
+        currency: session.currency,
+        transactionId,
         stripeSessionId: session.id,
         paymentStatus: "paid",
         paidAt: new Date(),
@@ -193,6 +221,7 @@ const verifyCheckoutSession = async (req, res) => {
 
       try {
         const result = await payments.insertOne(paymentRecord);
+
         payment = {
           _id: result.insertedId,
           ...paymentRecord,
@@ -205,6 +234,10 @@ const verifyCheckoutSession = async (req, res) => {
         payment = await payments.findOne({
           bookingId: booking._id.toString(),
         });
+
+        if (!payment) {
+          throw error;
+        }
       }
     }
 
@@ -227,7 +260,7 @@ const verifyCheckoutSession = async (req, res) => {
   } catch (error) {
     console.error("Verify payment error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to verify payment.",
     });
