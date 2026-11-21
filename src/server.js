@@ -9,8 +9,11 @@ import { createAuth } from "./config/auth.js";
 
 import { verifyToken } from "./middlewares/verifyToken.js";
 import { verifyAdmin } from "./middlewares/verifyRole.js";
+
 import adminRoutes from "./routes/adminRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 dotenv.config();
 
@@ -79,8 +82,15 @@ const startServer = async () => {
     // Service API routes
     app.use("/api/services", serviceRoutes);
 
+    // Booking API routes
+    app.use("/api/bookings", bookingRoutes);
+
+    // Payment API routes
+    app.use("/api/payments", paymentRoutes);
+
     // Admin API routes
-app.use("/api/admin", adminRoutes);
+    app.use("/api/admin", adminRoutes);
+
     app.listen(PORT, () => {
       console.log(`FixMate API server is running on port ${PORT}`);
     });

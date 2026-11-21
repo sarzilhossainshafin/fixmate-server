@@ -20,7 +20,8 @@
     "express": "^5.3.0",
     "jose": "^6.2.18",
     "jsonwebtoken": "^9.0.3",
-    "mongodb": "^7.9.0"
+    "mongodb": "^7.9.0",
+    "stripe": "^23.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
