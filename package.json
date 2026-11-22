@@ -21,6 +21,7 @@
     "jose": "^6.2.18",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.9.0",
+    "multer": "^2.5.0",
     "stripe": "^23.2.0"
   },
   "devDependencies": {

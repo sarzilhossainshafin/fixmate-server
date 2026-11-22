@@ -3,23 +3,26 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { toNodeHandler } from "better-auth/node";
-import userRoutes from "./routes/userRoutes.js";
+
 import { connectDB } from "./config/db.js";
 import { createAuth } from "./config/auth.js";
 
 import { verifyToken } from "./middlewares/verifyToken.js";
 import { verifyAdmin } from "./middlewares/verifyRole.js";
 
+import userRoutes from "./routes/userRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// CORS configuration
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
@@ -38,6 +41,7 @@ const startServer = async () => {
     // Better Auth routes
     app.all("/api/auth/*splat", toNodeHandler(auth));
 
+    // JSON middleware
     app.use(express.json());
 
     // Home route
@@ -79,6 +83,9 @@ const startServer = async () => {
       }
     );
 
+    // Image upload API routes
+    app.use("/api/upload", uploadRoutes);
+
     // Service API routes
     app.use("/api/services", serviceRoutes);
 
@@ -92,8 +99,9 @@ const startServer = async () => {
     app.use("/api/admin", adminRoutes);
 
     // User profile API routes
-app.use("/api/users", userRoutes);
+    app.use("/api/users", userRoutes);
 
+    // Start server
     app.listen(PORT, () => {
       console.log(`FixMate API server is running on port ${PORT}`);
     });

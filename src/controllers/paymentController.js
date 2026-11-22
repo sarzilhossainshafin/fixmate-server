@@ -61,10 +61,7 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // BDT uses two decimal places.
-    // Example: 2000 BDT = 200000 paisa.
     const amountInPaisa = Math.round(amount * 100);
-
     const frontendUrl =
       process.env.CLIENT_URL || "http://localhost:3000";
 
@@ -72,7 +69,6 @@ const createCheckoutSession = async (req, res) => {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-
       line_items: [
         {
           price_data: {
@@ -86,14 +82,11 @@ const createCheckoutSession = async (req, res) => {
           quantity: 1,
         },
       ],
-
       metadata: {
         bookingId: booking._id.toString(),
         customerEmail: req.user.email,
       },
-
       customer_email: req.user.email,
-
       success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/payment/cancel`,
     });
@@ -129,7 +122,6 @@ const verifyCheckoutSession = async (req, res) => {
     const stripe = getStripe();
     const db = getDB();
 
-    // Retrieve Checkout Session from Stripe
     const session =
       await stripe.checkout.sessions.retrieve(sessionId);
 
@@ -171,7 +163,6 @@ const verifyCheckoutSession = async (req, res) => {
       Number(booking.finalAmount) * 100
     );
 
-    // Confirm the actual amount and currency with Stripe
     if (
       session.currency !== "bdt" ||
       session.amount_total !== expectedAmount
@@ -184,7 +175,6 @@ const verifyCheckoutSession = async (req, res) => {
 
     const payments = db.collection("payments");
 
-    // Prevent duplicate payment records
     await payments.createIndex(
       { bookingId: 1 },
       { unique: true }
@@ -195,7 +185,6 @@ const verifyCheckoutSession = async (req, res) => {
       { unique: true }
     );
 
-    // Check whether payment was already recorded
     let payment = await payments.findOne({
       bookingId: booking._id.toString(),
     });
@@ -211,6 +200,7 @@ const verifyCheckoutSession = async (req, res) => {
         customerEmail: booking.customerEmail,
         technicianName: booking.technicianName || "",
         technicianEmail: booking.technicianEmail,
+        serviceTitle: booking.serviceTitle || "",
         amount: Number(booking.finalAmount),
         currency: session.currency,
         transactionId,
@@ -241,7 +231,6 @@ const verifyCheckoutSession = async (req, res) => {
       }
     }
 
-    // Update booking only after Stripe confirms payment
     await db.collection("bookings").updateOne(
       { _id: booking._id },
       {
@@ -267,7 +256,69 @@ const verifyCheckoutSession = async (req, res) => {
   }
 };
 
+// Customer: Get own payment history
+const getMyPayments = async (req, res) => {
+  try {
+    const db = getDB();
+
+    const payments = await db
+      .collection("payments")
+      .find({
+        customerEmail: req.user.email,
+      })
+      .sort({ paidAt: -1 })
+      .toArray();
+
+    // Get service titles for older payment records too
+    const bookingIds = payments
+      .map((payment) => payment.bookingId)
+      .filter((id) => id && ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+
+    const bookings = bookingIds.length
+      ? await db
+          .collection("bookings")
+          .find({
+            _id: { $in: bookingIds },
+          })
+          .project({
+            serviceTitle: 1,
+          })
+          .toArray()
+      : [];
+
+    const bookingMap = new Map(
+      bookings.map((booking) => [
+        booking._id.toString(),
+        booking.serviceTitle || "Repair Service",
+      ])
+    );
+
+    const paymentHistory = payments.map((payment) => ({
+      ...payment,
+      serviceTitle:
+        payment.serviceTitle ||
+        bookingMap.get(payment.bookingId) ||
+        "Repair Service",
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: paymentHistory.length,
+      payments: paymentHistory,
+    });
+  } catch (error) {
+    console.error("Get payment history error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load payment history.",
+    });
+  }
+};
+
 export {
   createCheckoutSession,
   verifyCheckoutSession,
+  getMyPayments,
 };

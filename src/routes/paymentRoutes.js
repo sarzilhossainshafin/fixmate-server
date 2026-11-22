@@ -4,6 +4,7 @@ import express from "express";
 import {
   createCheckoutSession,
   verifyCheckoutSession,
+  getMyPayments,
 } from "../controllers/paymentController.js";
 
 import { verifyToken } from "../middlewares/verifyToken.js";
@@ -25,6 +26,14 @@ router.get(
   verifyToken,
   verifyCustomer,
   verifyCheckoutSession
+);
+
+// Customer: Get own payment history
+router.get(
+  "/my",
+  verifyToken,
+  verifyCustomer,
+  getMyPayments
 );
 
 export default router;

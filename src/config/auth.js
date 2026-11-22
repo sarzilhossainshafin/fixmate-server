@@ -23,7 +23,7 @@ const createAuth = () => {
           type: ["customer", "technician", "admin"],
           required: false,
           defaultValue: "customer",
-          input: false,
+          input: true,
         },
         phone: {
           type: "string",
