@@ -6,6 +6,12 @@ import { jwt } from "better-auth/plugins";
 import { getDB } from "./db.js";
 
 const createAuth = () => {
+  console.log("Google OAuth environment check:", {
+    clientIdLoaded: Boolean(process.env.GOOGLE_CLIENT_ID),
+    clientSecretLoaded: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+    baseURLLoaded: Boolean(process.env.BETTER_AUTH_URL),
+  });
+
   return betterAuth({
     database: mongodbAdapter(getDB()),
 
@@ -15,6 +21,14 @@ const createAuth = () => {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 6,
+    },
+
+    // Google Login
+    socialProviders: {
+      google: {
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      },
     },
 
     user: {
